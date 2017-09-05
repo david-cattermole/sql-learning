@@ -1,0 +1,14 @@
+{
+  "hostname": "<hostname>",
+  "username": "<user>",
+  "password": "<password>",
+  "database": "<database name>",
+  "port": 3306,
+  "includes": [
+    "/data"
+  ],
+  "excludes": [
+    "/data/Music/albumArt",
+    "/data/Music/lyrics"
+  ]
+}
