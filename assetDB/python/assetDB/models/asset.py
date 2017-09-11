@@ -2,25 +2,21 @@
 Asset table.
 """
 
+import uuid
 from sqlalchemy import (
     Column, Integer, String, ForeignKey
 )
+from sqlalchemy.sql.expression import text
 from sqlalchemy.orm import relationship
-from assetDB.tables import tablebase as base
+from assetDB.models import modelbase as base
+from assetDB.models import mixins
 
 
-class AssetStatus(base.Base):
+class AssetStatus(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_status'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetStatus',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
 
     assets = relationship('Asset')
 
@@ -45,24 +41,15 @@ class AssetStatus(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(AssetStatus, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetCategory(base.Base):
+class AssetCategory(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_category'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetCategory',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    # assets = relationship('AssetStatus')
 
     name = Column(
         'name',
@@ -84,12 +71,14 @@ class AssetCategory(base.Base):
         nullable=True,
     )
 
+    # assets = relationship('AssetStatus')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(AssetCategory, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class Asset(base.Base):
+class Asset(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset'
     __mapper_args__ = {
         'polymorphic_identity': 'Asset',
@@ -98,20 +87,6 @@ class Asset(base.Base):
         'mysql_engine': 'InnoDB',
         'mysql_charset': 'utf8',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
 
     asset_status_id = Column(
         'asset_status_id',
@@ -196,27 +171,6 @@ class Asset(base.Base):
 
     # asset_datas = relationship('AssetData')
 
-    # created_datetime = Column(
-    #     'created_datetime',
-    #     DateTime,
-    #     default=datetime.datetime.utcnow(),
-    # )
-    #
-    # created_user_id = Column(
-    #     'created_user_id',
-    #     ForeignKey('user.id'),
-    #     nullable=True,
-    #     default=setup.get_current_user,
-    # )
-    #
-    # created_site_id = Column(
-    #     'created_site_id',
-    #     ForeignKey('site.id'),
-    #     default=setup.get_current_site,
-    #     nullable=True,
-    # )
-
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetCategory, self).__init__()
         self._setKeywordFields(**kwargs)

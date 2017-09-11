@@ -6,23 +6,15 @@ from sqlalchemy import (
     Column, Integer, String, ForeignKey
 )
 from sqlalchemy.orm import relationship
-from assetDB.tables import tablebase as base
+from assetDB.models import modelbase as base
+from assetDB.models import mixins
 
 
-class SequenceStatus(base.Base):
+class SequenceStatus(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'sequence_status'
     __mapper_args__ = {
         'polymorphic_identity': 'SequenceStatus',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    sequences = relationship('Sequence')
 
     name = Column(
         'name',
@@ -44,25 +36,21 @@ class SequenceStatus(base.Base):
         nullable=True,
     )
 
+    sequences = relationship(
+        'Sequence',
+        primaryjoin='SequenceStatus.id==Sequence.sequence_status_id'
+    )
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(SequenceStatus, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class SequenceCategory(base.Base):
+class SequenceCategory(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'sequence_category'
     __mapper_args__ = {
         'polymorphic_identity': 'SequenceCategory',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    sequences = relationship('Sequence')
 
     name = Column(
         'name',
@@ -84,34 +72,21 @@ class SequenceCategory(base.Base):
         nullable=True,
     )
 
+    sequences = relationship(
+        'Sequence',
+        primaryjoin='SequenceCategory.id==Sequence.sequence_category_id'
+    )
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(SequenceCategory, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class Sequence(base.Base):
+class Sequence(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'sequence'
     __mapper_args__ = {
         'polymorphic_identity': 'Sequence'
     }
-    __table_args__ = {
-        'mysql_engine': 'InnoDB',
-        'mysql_charset': 'utf8',
-    }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
 
     config_file_id = Column(
         'config_file_id',
@@ -178,10 +153,13 @@ class Sequence(base.Base):
 
     project = relationship(
         'Project',
-        foreign_keys=[project_id]
+        primaryjoin='Sequence.project_id==Project.id'
     )
 
-    shots = relationship('Shot')
+    shots = relationship(
+        'Shot',
+        primaryjoin='Sequence.id==Shot.sequence_id'
+    )
 
     name = Column(
         'name',
@@ -197,6 +175,5 @@ class Sequence(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(Sequence, self).__init__()
         self._setKeywordFields(**kwargs)

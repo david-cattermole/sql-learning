@@ -1,20 +1,14 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship, backref
-from assetDB.tables import tablebase as base
+from assetDB.models import modelbase as base
+from assetDB.models import mixins
 
 
-class OperatingSystem(base.Base):
+class OperatingSystem(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'operating_system'
     __mapper_args__ = {
         'polymorphic_identity': 'OperatingSystem',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
 
     storage_roots = relationship('StorageRoot')
 
@@ -26,22 +20,15 @@ class OperatingSystem(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(OperatingSystem, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class StorageRoot(base.Base):
+class StorageRoot(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'storage_root'
     __mapper_args__ = {
         'polymorphic_identity': 'StorageRoot',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
 
     project_id = Column(
         'project_id',
@@ -99,23 +86,16 @@ class StorageRoot(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(StorageRoot, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class ProjectStatus(base.Base):
+class ProjectStatus(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'project_status'
     __mapper_args__ = {
         'polymorphic_identity': 'ProjectStatus',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -139,24 +119,16 @@ class ProjectStatus(base.Base):
     # projects = relationship('Project')
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(ProjectStatus, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class ProjectCategory(base.Base):
+class ProjectCategory(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'project_category'
     __mapper_args__ = {
         'polymorphic_identity': 'ProjectCategory',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -180,29 +152,15 @@ class ProjectCategory(base.Base):
     # projects = relationship('Project')
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(ProjectCategory, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class Project(base.Base):
+class Project(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'project'
     __mapper_args__ = {
         'polymorphic_identity': 'Project',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
 
     project_status_id = Column(
         'project_status_id',
@@ -267,12 +225,12 @@ class Project(base.Base):
         unique=False,
     )
 
+    # # TODO: Implement 'keyvalues' (tags).
     # keyvalues = relationship(
     #         "KeyValue",
     #         secondary=keyvalue_project_table,
     #     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(Project, self).__init__()
         self._setKeywordFields(**kwargs)

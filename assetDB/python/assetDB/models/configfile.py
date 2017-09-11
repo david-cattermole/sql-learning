@@ -1,21 +1,15 @@
 from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship, backref
-from assetDB.tables import tablebase as base
+from assetDB.models import modelbase as base
+from assetDB.models import mixins
 
 
-class ConfigFileStatus(base.Base):
+class ConfigFileStatus(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'config_file_status'
     __mapper_args__ = {
         'polymorphic_identity': 'ConfigFileStatus',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -39,23 +33,16 @@ class ConfigFileStatus(base.Base):
     config_files = relationship('ConfigFile')
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(ConfigFileStatus, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class ConfigFileCategory(base.Base):
+class ConfigFileCategory(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'config_file_category'
     __mapper_args__ = {
         'polymorphic_identity': 'ConfigFileCategory',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -79,29 +66,15 @@ class ConfigFileCategory(base.Base):
     config_files = relationship('ConfigFile')
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(ConfigFileCategory, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class ConfigFile(base.Base):
+class ConfigFile(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'config_file'
     __mapper_args__ = {
         'polymorphic_identity': 'ConfigFile',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
 
     config_file_status_id = Column(
         'config_file_status_id',
@@ -145,23 +118,15 @@ class ConfigFile(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(ConfigFile, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class ConfigFileVersion(base.Base):
+class ConfigFileVersion(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'config_file_version'
     __mapper_args__ = {
         'polymorphic_identity': 'ConfigFileVersion',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
 
     config_file_id = Column(
         'config_file_id',
@@ -202,6 +167,5 @@ class ConfigFileVersion(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(ConfigFileVersion, self).__init__()
         self._setKeywordFields(**kwargs)

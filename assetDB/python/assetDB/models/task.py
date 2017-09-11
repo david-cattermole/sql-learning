@@ -4,21 +4,15 @@ Task table.
 
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from assetDB.tables import tablebase as base
+from assetDB.models import modelbase as base
+from assetDB.models import mixins
 
 
-class TaskStatus(base.Base):
+class TaskStatus(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'task_status'
     __mapper_args__ = {
         'polymorphic_identity': 'TaskStatus',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
 
     tasks = relationship('Task')
 
@@ -43,35 +37,55 @@ class TaskStatus(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(TaskStatus, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class Task(base.Base):
+class TaskCategory(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
+    __tablename__ = 'task_category'
+    __mapper_args__ = {
+        'polymorphic_identity': 'TaskCategory',
+    }
+
+    name = Column(
+        'name',
+        String(base.NAME_LENGTH),
+        nullable=False,
+        unique=True,
+    )
+
+    label = Column(
+        'label',
+        String(base.LABEL_LENGTH),
+        nullable=False,
+        unique=False,
+    )
+
+    description = Column(
+        'description',
+        String(base.DESCRIPTION_LENGTH),
+        nullable=True,
+    )
+
+    tasks = relationship('Task')
+
+    def __init__(self, **kwargs):
+        super(TaskCategory, self).__init__()
+        self._setKeywordFields(**kwargs)
+
+
+class Task(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'task'
     __mapper_args__ = {
         'polymorphic_identity': 'Task',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
-
-    # many to many 'UserGroup <-> User'
+    # many to many 'Task <-> User'
     users = relationship(
         'User',
         secondary='task_to_user',
+        primaryjoin='Task.id==TaskToUser.task_id',
+        secondaryjoin='TaskToUser.user_id==User.id'
     )
 
     def destination_neighbours(self):
@@ -96,10 +110,6 @@ class Task(base.Base):
         unique=False,
     )
 
-    asset = relationship('Asset')
-
-    shot = relationship('Shot')
-
     department_id = Column(
         'department_id',
         Integer,
@@ -108,8 +118,6 @@ class Task(base.Base):
         unique=False,
     )
 
-    department = relationship('Department')
-
     site_id = Column(
         'site_id',
         Integer,
@@ -117,8 +125,14 @@ class Task(base.Base):
         nullable=True,
         unique=False,
     )
-
-    site = relationship('Site', back_populates='tasks')
+    
+    task_category_id = Column(
+        'task_category_id',
+        Integer,
+        ForeignKey('task_category.id', onupdate='CASCADE', ondelete='CASCADE'),
+        nullable=False,
+        unique=False,
+    )
 
     task_status_id = Column(
         'task_status_id',
@@ -127,10 +141,6 @@ class Task(base.Base):
         nullable=False,
         unique=False,
     )
-
-    task_status = relationship('TaskStatus', back_populates='tasks')
-
-    date_ranges = relationship('TaskDateRange')
 
     name = Column(
         'name',
@@ -145,13 +155,26 @@ class Task(base.Base):
         nullable=True,
     )
 
+    asset = relationship('Asset')
+
+    shot = relationship('Shot')
+
+    department = relationship('Department')
+
+    site = relationship('Site', back_populates='tasks')
+
+    task_status = relationship('TaskStatus', back_populates='tasks')
+
+    task_category = relationship('TaskCategory', back_populates='tasks')
+    
+    date_ranges = relationship('TaskDateRange')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(Task, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class TaskDependency(base.Base):
+class TaskDependency(base.Base, mixins.CreatedUpdatedMixin):
     __tablename__ = 'task_dependency'
     __mapper_args__ = {
         'polymorphic_identity': 'TaskDependency',
@@ -187,7 +210,7 @@ class TaskDependency(base.Base):
         self.destination_task = task2
 
 
-class TaskToUser(base.Base):
+class TaskToUser(base.Base, mixins.CreatedUpdatedMixin):
     __tablename__ = 'task_to_user'
     __mapper_args__ = {
         'polymorphic_identity': 'TaskToUser',
@@ -196,25 +219,29 @@ class TaskToUser(base.Base):
     task_id = Column(
         'task_id',
         Integer,
-        ForeignKey('task.id', onupdate='CASCADE', ondelete='CASCADE'),
+        ForeignKey('task.id',
+                   onupdate='CASCADE',
+                   ondelete='CASCADE'),
         primary_key=True,
     )
 
     user_id = Column(
         'user_id',
         Integer,
-        ForeignKey('user.id', onupdate='CASCADE', ondelete='CASCADE'),
+        ForeignKey('user.id',
+                   onupdate='CASCADE',
+                   ondelete='CASCADE'),
         primary_key=True,
     )
 
     task = relationship(
-        Task,
-        primaryjoin='TaskToUser.task_id==Task.id',
+        'Task',
+        primaryjoin='TaskToUser.task_id==Task.id'
     )
 
     user = relationship(
         'User',
-        primaryjoin='TaskToUser.user_id==User.id',
+        primaryjoin='TaskToUser.user_id==User.id'
     )
 
     def __init__(self, task, user):
@@ -222,25 +249,11 @@ class TaskToUser(base.Base):
         self.user = user
 
 
-class TaskDateRange(base.Base):
+class TaskDateRange(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'task_date_range'
     __mapper_args__ = {
         'polymorphic_identity': 'TaskDateRange',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
 
     task_id = Column(
         'task_id',
@@ -267,6 +280,5 @@ class TaskDateRange(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(TaskDateRange, self).__init__()
         self._setKeywordFields(**kwargs)

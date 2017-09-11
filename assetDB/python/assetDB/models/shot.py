@@ -6,21 +6,15 @@ from sqlalchemy import (
     Column, Integer, String, ForeignKey
 )
 from sqlalchemy.orm import relationship
-from assetDB.tables import tablebase as base
+from assetDB.models import modelbase as base
+from assetDB.models import mixins
 
 
-class ShotStatus(base.Base):
+class ShotStatus(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'shot_status'
     __mapper_args__ = {
         'polymorphic_identity': 'ShotStatus',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
 
     shots = relationship('Shot')
 
@@ -45,22 +39,15 @@ class ShotStatus(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(ShotStatus, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class ShotCategory(base.Base):
+class ShotCategory(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'shot_category'
     __mapper_args__ = {
         'polymorphic_identity': 'ShotCategory',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
 
     shots = relationship('Shot')
 
@@ -85,11 +72,11 @@ class ShotCategory(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(ShotCategory, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class Shot(base.Base):
+class Shot(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'shot'
     __mapper_args__ = {
         'polymorphic_identity': 'Shot'
@@ -98,20 +85,6 @@ class Shot(base.Base):
         'mysql_engine': 'InnoDB',
         'mysql_charset': 'utf8',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
 
     config_file_id = Column(
         'config_file_id',
@@ -127,7 +100,7 @@ class Shot(base.Base):
 
     config_file = relationship(
         'ConfigFile',
-        foreign_keys=[config_file_id]
+        primaryjoin='Shot.config_file_id==ConfigFile.id',
     )
 
     shot_status_id = Column(
@@ -144,7 +117,7 @@ class Shot(base.Base):
 
     shot_status = relationship(
         'ShotStatus',
-        foreign_keys=[shot_status_id]
+        primaryjoin='Shot.shot_status_id==ShotStatus.id',
     )
 
     shot_category_id = Column(
@@ -161,24 +134,16 @@ class Shot(base.Base):
 
     shot_category = relationship(
         'ShotCategory',
-        foreign_keys=[shot_category_id]
-    )
-
-    project_id = Column(
-        'project_id',
-        Integer,
-        ForeignKey(
-            'project.id',
-            onupdate='CASCADE',
-            ondelete='CASCADE'
-        ),
-        nullable=False,
-        unique=False,
+        primaryjoin='Shot.shot_category_id==ShotCategory.id',
     )
 
     project = relationship(
         'Project',
-        foreign_keys=[project_id]
+        secondary='sequence',
+        primaryjoin='Shot.sequence_id==Sequence.id',
+        secondaryjoin='Sequence.project_id==Project.id',
+        uselist=False,
+        viewonly=True,
     )
 
     sequence_id = Column(
@@ -195,7 +160,7 @@ class Shot(base.Base):
 
     sequence = relationship(
         'Sequence',
-        foreign_keys=[sequence_id]
+        primaryjoin='Shot.sequence_id==Sequence.id'
     )
 
     scene_id = Column(
@@ -212,10 +177,13 @@ class Shot(base.Base):
 
     scene = relationship(
         'Scene',
-        foreign_keys=[scene_id]
+        primaryjoin='Shot.scene_id==Scene.id'
     )
 
-    tasks = relationship('Task')
+    tasks = relationship(
+        'Task',
+        primaryjoin='Shot.id==Task.shot_id'
+    )
 
     name = Column(
         'name',
@@ -243,6 +211,5 @@ class Shot(base.Base):
     cache_range_end = Column('cache_range_end', Integer, nullable=True)
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(Shot, self).__init__()
         self._setKeywordFields(**kwargs)

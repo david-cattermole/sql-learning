@@ -6,23 +6,15 @@ from sqlalchemy import (
     Column, Integer, String, ForeignKey
 )
 from sqlalchemy.orm import relationship
-from assetDB.tables import tablebase as base
+from assetDB.models import modelbase as base
+from assetDB.models import mixins
 
 
-class SceneStatus(base.Base):
+class SceneStatus(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'scene_status'
     __mapper_args__ = {
         'polymorphic_identity': 'SceneStatus',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    scenes = relationship('Scene')
 
     name = Column(
         'name',
@@ -44,25 +36,18 @@ class SceneStatus(base.Base):
         nullable=True,
     )
 
+    scenes = relationship('Scene')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(SceneStatus, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class SceneCategory(base.Base):
+class SceneCategory(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'scene_category'
     __mapper_args__ = {
         'polymorphic_identity': 'SceneCategory',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    scenes = relationship('Scene')
 
     name = Column(
         'name',
@@ -84,34 +69,18 @@ class SceneCategory(base.Base):
         nullable=True,
     )
 
+    scenes = relationship('Scene')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(SceneCategory, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class Scene(base.Base):
+class Scene(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'scene'
     __mapper_args__ = {
         'polymorphic_identity': 'Scene'
     }
-    __table_args__ = {
-        'mysql_engine': 'InnoDB',
-        'mysql_charset': 'utf8',
-    }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
 
     config_file_id = Column(
         'config_file_id',
@@ -181,7 +150,10 @@ class Scene(base.Base):
         foreign_keys=[project_id]
     )
 
-    shots = relationship('Shot')
+    shots = relationship(
+        'Shot',
+        primaryjoin='Scene.id==Shot.scene_id'
+    )
 
     name = Column(
         'name',
@@ -197,6 +169,5 @@ class Scene(base.Base):
     )
 
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(Scene, self).__init__()
         self._setKeywordFields(**kwargs)

@@ -1,25 +1,22 @@
+"""
+Asset Data database tables
+
+TODO: Add the ability for an AssetData class to have a thumbnail.
+"""
 from sqlalchemy import (
     Column, Integer, String, Boolean, ForeignKey
 )
 from sqlalchemy.orm import relationship
 
-from assetDB.tables import tablebase as base
+from assetDB.models import mixins
+from assetDB.models import modelbase as base
 
 
-class AssetDataStatus(base.Base):
+class AssetDataStatus(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_status'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataStatus',
     }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    # asset_data = relationship('AssetData')
 
     name = Column(
         'name',
@@ -41,26 +38,19 @@ class AssetDataStatus(base.Base):
         nullable=True,
     )
 
+    asset_datas = relationship('AssetData')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
+        super(AssetDataStatus, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetDataName(base.Base):
+class AssetDataName(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_name'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataName',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    # asset_datas = relationship('AssetData')
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -68,27 +58,19 @@ class AssetDataName(base.Base):
         unique=True,
     )
 
+    asset_datas = relationship('AssetData')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetDataName, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetDataSubname(base.Base):
+class AssetDataSubname(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_subname'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataSubname',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    # asset_datas = relationship('AssetData')
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -96,27 +78,19 @@ class AssetDataSubname(base.Base):
         unique=True,
     )
 
+    asset_datas = relationship('AssetData')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetDataSubname, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetDataVariant(base.Base):
+class AssetDataVariant(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_variant'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataVariant',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    # asset_datas = relationship('AssetData')
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -124,27 +98,19 @@ class AssetDataVariant(base.Base):
         unique=True,
     )
 
+    asset_datas = relationship('AssetData')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetDataVariant, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetDataResolution(base.Base):
+class AssetDataResolution(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_resolution'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataResolution',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    # asset_datas = relationship('AssetData')
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -152,27 +118,19 @@ class AssetDataResolution(base.Base):
         unique=True,
     )
 
+    asset_datas = relationship('AssetData')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetDataResolution, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetDataInstance(base.Base):
+class AssetDataInstance(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_instance'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataInstance',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    # asset_datas = relationship('AssetData')
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -180,27 +138,19 @@ class AssetDataInstance(base.Base):
         unique=True,
     )
 
+    asset_datas = relationship('AssetData')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetDataInstance, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetDataType(base.Base):
+class AssetDataType(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_type'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataType',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    # asset_datas = relationship('AssetData')
-
     name = Column(
         'name',
         String(base.NAME_LENGTH),
@@ -208,35 +158,18 @@ class AssetDataType(base.Base):
         unique=True,
     )
 
+    asset_datas = relationship('AssetData')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetDataType, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetData(base.Base):
+class AssetData(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetData',
     }
-    __table_args__ = {
-        'mysql_engine': 'InnoDB',
-        'mysql_charset': 'utf8',
-    }
-
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
-    )
 
     shot_id = Column(
         'shot_id', Integer,
@@ -349,20 +282,12 @@ class AssetData(base.Base):
 
     asset_data_versions = relationship('AssetDataVersion')
 
-    # @declared_attr
-    # def keyvalues(cls):
-    #     return relationship(
-    #         "KeyValue",
-    #         secondary=keyvalue_assetdata_table,
-    #     )
-
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetData, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetDataVersion(base.Base):
+class AssetDataVersion(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_version'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataVersion',
@@ -372,42 +297,22 @@ class AssetDataVersion(base.Base):
         'mysql_charset': 'utf8',
     }
 
-    id = Column(
-        'id',
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
-
     asset_data_id = Column(
         'asset_data_id', Integer,
         ForeignKey('asset_data.id', onupdate='CASCADE', ondelete='CASCADE'),
         nullable=False
     )
 
-    asset_data = relationship('AssetData')
-
-    media_id = Column(
-        'media_id', Integer,
-        ForeignKey('media.id', onupdate='CASCADE', ondelete='CASCADE'),
+    media_version_id = Column(
+        'media_version_id', Integer,
+        ForeignKey('media_version.id', onupdate='CASCADE', ondelete='CASCADE'),
         nullable=True
     )
-
-    media = relationship('Media')
 
     task_id = Column(
         'task_id', Integer,
         ForeignKey('task.id', onupdate='CASCADE', ondelete='CASCADE'),
         nullable=True
-    )
-
-    task = relationship('Task')
-
-    code = Column(
-        'code',
-        String(base.CODE_LENGTH),
-        nullable=False,
-        unique=True,
     )
 
     comment = Column(
@@ -445,13 +350,18 @@ class AssetDataVersion(base.Base):
         unique=False,
     )
 
+    asset_data = relationship('AssetData')
+
+    media_version = relationship('MediaVersion')
+
+    task = relationship('Task')
+
     def __init__(self, **kwargs):
-        super(self.__class__, self).__init__()
-        self.code = base.getCode()
+        super(AssetDataVersion, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
-class AssetDataDependency(base.Base):
+class AssetDataDependency(base.Base, mixins.CreatedUpdatedMixin):
     __tablename__ = 'asset_data_dependency'
     __mapper_args__ = {
         'polymorphic_identity': 'AssetDataDependency',
@@ -482,6 +392,7 @@ class AssetDataDependency(base.Base):
         backref='destination_connections'
     )
 
-    def __init__(self, asset_data1, asset_data2):
-        self.source_asset_data = asset_data1
-        self.destination_asset_data = asset_data2
+    def __init__(self, src_asset_data, dst_asset_data):
+        super(AssetDataDependency, self).__init__()
+        self.source_asset_data = src_asset_data
+        self.destination_asset_data = dst_asset_data
