@@ -5,14 +5,15 @@ import sys
 import os
 import random
 import datetime
+import getpass
 from collections import defaultdict
 from sqlalchemy import create_engine
 
 path = 'U:/Windows_Dev/sql-learning/assetDB/python'
 sys.path.insert(0, os.path.abspath(path))
 import assetDB.setup as setup
-import assetDB.tables.tablebase as tablebase
-from assetDB.tables import *
+import assetDB.models.modelbase as base
+from assetDB.models import *
 import assetDB.config as config
 
 
@@ -139,7 +140,6 @@ def createUsers(session):
         cfg = config.getSiteConfig(name)
         s = Site(name=name, **cfg)
         sites.append(s)
-    setup.set_sites(session, sites)
     session.add_all(sites)
     session.commit()
 
@@ -177,13 +177,14 @@ def createUsers(session):
     session.commit()
 
     # User Status
-    names = ['complete', 'in_progress', 'open']
+    names = ['active', 'na']
     statuses = createGenericStatus(UserStatus, names=names)
     session.add_all(statuses)
     session.commit()
 
     # Users
-    names = ['david', 'jeff', 'mark', 'robert', 'jez', 'superhans']
+    user_name = getpass.getuser()
+    names = [user_name, 'david', 'jeff', 'mark', 'robert', 'jez', 'superhans']
     users = []
     for name in names:
         u = User(
@@ -213,6 +214,9 @@ def queryUsers(session):
         print '-' * 25
         print 'name:', site.name
         print 'address:', site.address
+        print 'created_user_name:', site.created_user_name
+        print 'created_user:', site.created_user
+        print 'site:', site.created_user
 
     # Query all Departments
     q = session.query(Department)
@@ -268,13 +272,20 @@ def queryUsers(session):
 def createTasks(session):
     # Query everything
     sites = session.query(Site).all()
-    depts = session.query(Department).all()
     users = session.query(User).all()
+    depts = session.query(Department).all()
+    # cur_user = assetDB.setup.get_current_user(session)
 
     # Task Status
     names = ['complete', 'in_progress', 'open']
     task_statuses = createGenericStatus(TaskStatus, names=names)
     session.add_all(task_statuses)
+    session.commit()
+    
+    # Task Category
+    names = ['category']
+    task_categories = createGenericStatus(TaskCategory, names=names)
+    session.add_all(task_categories)
     session.commit()
 
     # Tasks
@@ -286,9 +297,12 @@ def createTasks(session):
     date_ranges = []
     for name in names:
         status = random.choice(task_statuses)
+        category = random.choice(task_categories)
         u = Task(
             name=name,
-            task_status_id=status.id,
+            task_category=category,
+            task_status=status,
+            # task_status_id=status.id,
         )
         u.users.append(random.choice(users))
         u.department = random.choice(depts)
@@ -335,6 +349,26 @@ def createTasks(session):
 
 
 def queryTasks(session):
+    # Query all task categories
+    q = session.query(TaskCategory)
+    categories = q.all()
+    print '=' * 80
+    print 'TaskCategories...'
+    for category in categories:
+        print '-' * 25
+        print 'name:', category.name
+        print 'tasks:', category.tasks
+        
+    # Query all task statuses
+    q = session.query(TaskStatus)
+    statuses = q.all()
+    print '=' * 80
+    print 'TaskStatuses...'
+    for status in statuses:
+        print '-' * 25
+        print 'name:', status.name
+        print 'tasks:', status.tasks
+    
     # Query all tasks
     q = session.query(Task)
     all_tasks = q.all()
@@ -347,6 +381,7 @@ def queryTasks(session):
         print 'department:', task.department
         print 'date_ranges:', task.date_ranges
         print 'task_status:', task.task_status
+        print 'task_category:', task.task_category
 
     # Query all task dependencies
     q = session.query(TaskDependency)
@@ -480,8 +515,7 @@ def createAssets(session):
         cfg, cfgv = createConfigFile(session, name=name, status=cfg_status[0])
         ac = AssetCategory(
             name=name,
-            label=label,
-            config_file=cfg,
+            label=label
         )
         categories.append(ac)
     session.add_all(categories)
@@ -519,8 +553,10 @@ def queryAssets(session):
     return
 
 
-def createMedia(session):
-    projs = session.query(Project).all()
+def createMediaVersions(session):
+    # projs = session.query(Project).all()
+    shots = session.query(Shot).all()
+    assets = session.query(Asset).all()
     tasks = session.query(Task).all()
 
     # Image Resolution
@@ -547,44 +583,69 @@ def createMedia(session):
     session.commit()
 
     # Media Statuses
-    names = ['reviewed', 'pending', 'not_for_review', 'approved']
+    media_version_names = ['reviewed', 'pending', 'not_for_review', 'approved']
     labels = ['Reviewed', 'Pending', 'Not For Review', 'Approved']
     statuses = createGenericStatus(
         MediaVersionStatus,
-        names=names,
+        names=media_version_names,
         labels=labels
     )
     session.add_all(statuses)
     session.commit()
 
-    # Media
+    # Media Version Categories
+    media_version_names = ['viewport_preview', 'render',
+             'previs', 'composite', 'client_plate']
+    labels = ['Viewport Preview', '3D Render',
+              'Pre-Visualisation', '2D composite', 'client_plate']
+    categories = []
+    for media_version_name, label in zip(media_version_names, labels):
+        ac = MediaVersionCategory(
+            name=media_version_name,
+            label=label
+        )
+        categories.append(ac)
+    session.add_all(categories)
+    session.commit()
+
+    # Media Names
     names = ['layout', 'comp', 'animation', 'model', 'shader']
-    medias = []
-    for proj in projs:
-        for name in names:
-            a = Media(
-                name=name,
-                project=proj,
-            )
-            medias.append(a)
-    session.add_all(medias)
+    media_version_names = []
+    for name in names:
+        m = MediaVersionName(
+            name=name
+        )
+        media_version_names.append(m)
+    session.add_all(media_version_names)
+    session.commit()
+
+    # Media Subnames
+    names = ['media_subname']
+    media_version_subnames = []
+    for name in names:
+        m = MediaVersionName(
+            name=name
+        )
+        media_version_subnames.append(m)
+    session.add_all(media_version_names)
     session.commit()
 
     # Media Versions
     min_value = 1
     max_value = 3
     media_versions = []
-    for media in medias:
+    for media_version_name in media_version_names:
         # app_ver = random.randint(min_value, max_value)
         # app_rev = random.randint(min_value, max_value)
         for i in range(min_value, random.randint(min_value, max_value)):
             for j in range(min_value, random.randint(min_value, max_value)):
                 mv = MediaVersion(
-                    media=media,
+                    media_version_name=media_version_name,
                     version=i,
                     revision=j,
                     task=random.choice(tasks),
                     media_version_status=random.choice(statuses),
+                    media_version_category=random.choice(categories),
                     image_resolution=random.choice(image_reses)
                 )
                 media_versions.append(mv)
@@ -593,7 +654,7 @@ def createMedia(session):
     return
 
 
-def queryMedia(session):
+def queryMediaVersions(session):
     # Image Resolution
     q = session.query(ImageResolution)
     all_reses = q.all()
@@ -608,33 +669,56 @@ def queryMedia(session):
 
     # Media Version Status
     q = session.query(MediaVersionStatus)
-    all_statuses = q.all()
+    statuses = q.all()
     print '=' * 80
     print 'MediaVersionStatus...'
-    for status in all_statuses:
+    for status in statuses:
         print '-' * 25
         print 'name:', status.name
         print 'label:', status.label
         print 'description:', status.description
-
-    # Media
-    q = session.query(Media)
-    all_media = q.all()
+        
+    # Media Version Category
+    q = session.query(MediaVersionCategory)
+    categories = q.all()
     print '=' * 80
-    print 'Media...'
-    for media in all_media:
+    print 'MediaVersionCategory...'
+    for category in categories:
         print '-' * 25
-        print 'name:', media.name
+        print 'name:', category.name
+        print 'label:', category.label
+        print 'description:', category.description
+
+    # Media Names
+    q = session.query(MediaVersionName)
+    names = q.all()
+    print '=' * 80
+    print 'MediaVersionName...'
+    for name in names:
+        print '-' * 25
+        print 'name:', name.name
+        
+    # Media Subnames
+    q = session.query(MediaVersionSubname)
+    subnames = q.all()
+    print '=' * 80
+    print 'MediaVersionSubname...'
+    for subname in subnames:
+        print '-' * 25
+        print 'name:', subname.subname
 
     # Media Versions
     q = session.query(MediaVersion)
     all_media_versions = q.all()
     print '=' * 80
-    print 'Media...'
+    print 'MediaVersion...'
     for ver in all_media_versions:
+        print 'name:', ver.media_version_name
+        print 'subname:', ver.media_version_subname
         print 'version:', ver.version
         print 'revision:', ver.revision
         print 'status:', ver.media_version_status
+        print 'category:', ver.media_version_category
         print 'task:', ver.task
         print 'res:', ver.image_resolution
     return
@@ -642,8 +726,8 @@ def queryMedia(session):
 
 def createSequences(session):
     projs = session.query(Project).all()
-    cfg_status = session.query(ConfigFileStatus).filter(
-        ConfigFileStatus.name == 'active').all()
+    cfg_status = session.query(ConfigFileStatus) \
+        .filter(ConfigFileStatus.name == 'active').all()
 
     # Sequence Statuses
     names = ['complete', 'in_progress', 'not_started']
@@ -728,8 +812,8 @@ def querySequences(session):
 
 def createScenes(session):
     projs = session.query(Project).all()
-    cfg_status = session.query(ConfigFileStatus).filter(
-        ConfigFileStatus.name == 'active').all()
+    cfg_status = session.query(ConfigFileStatus) \
+        .filter(ConfigFileStatus.name == 'active').all()
 
     # Scene Statuses
     names = ['complete', 'in_progress', 'not_started']
@@ -815,8 +899,8 @@ def queryScenes(session):
 def createShots(session):
     projs = session.query(Project).all()
     tasks = session.query(Task).all()
-    cfg_status = session.query(ConfigFileStatus).filter(
-        ConfigFileStatus.name == 'active').all()
+    cfg_status = session.query(ConfigFileStatus)\
+        .filter(ConfigFileStatus.name == 'active').all()
 
     # Shot Statuses
     names = ['complete', 'in_progress', 'not_started']
@@ -852,18 +936,19 @@ def createShots(session):
     ]
     shots = []
     for proj in projs:
-        seqs = session.query(Sequence).filter(Project.id == proj.id).all()
-        scns = session.query(Scene).filter(Project.id == proj.id).all()
+        seqs = session.query(Sequence).filter(Sequence.project_id == proj.id).all()
+        scns = session.query(Scene).filter(Scene.project_id == proj.id).all()
         for name in names:
             cfg, cfgv = createConfigFile(session, name=name, status=cfg_status[0])
             seq = random.choice(seqs)
             scn = random.choice(scns)
+            assert seq.project_id == scn.project_id
+
             sht = Shot(
                 name=name,
                 shot_status=random.choice(shot_statuses),
                 shot_category=random.choice(shot_categories),
                 config_file=cfg,
-                project=proj,
                 sequence=seq,
                 scene=scn,
             )
@@ -907,6 +992,12 @@ def queryShots(session):
         print 'status:', shot.shot_status
         print 'category:', shot.shot_category
         print 'tasks:', shot.tasks
+        print 'project:', shot.project
+        print 'sequence:', shot.sequence
+        print 'scene:', shot.scene
+        assert shot.sequence.project_id == shot.scene.project_id
+        assert shot.project.id == shot.scene.project_id
+        assert shot.project.id == shot.sequence.project_id
     return
 
 
@@ -952,8 +1043,9 @@ def createAssetDatas(session):
     for proj in projs:
 
         # Project
-        shots = session.query(Shot).filter(Project.id == proj.id).all()
-        # assets = session.query(Asset).filter(Project.id == proj.id).all()
+        shots = session.query(Shot) \
+            .join(Shot.sequence, Sequence.project) \
+            .filter(Project.id == proj.id).all()
         for name in names:
             assets = session.query(Asset).filter(Asset.project_id == proj.id,
                                                  Asset.name == name.name).all()
@@ -961,8 +1053,6 @@ def createAssetDatas(session):
 
             shot = random.choice(shots)
             ad = AssetData(
-                name=name,
-                project=proj,
                 asset=asset,
                 shot=shot,
                 asset_data_name=random.choice(names),
@@ -1012,6 +1102,54 @@ def queryAssetDatas(session):
         print 'category:', asset.asset_category.name
         print 'status:', asset.asset_status.name
 
+    q = session.query(AssetDataName)
+    names = q.all()
+    print '=' * 80
+    print 'AssetDataNames...'
+    for name in names:
+        print '-' * 25
+        print 'name:', name.name
+
+    q = session.query(AssetDataSubname)
+    names = q.all()
+    print '=' * 80
+    print 'AssetDataSubnames...'
+    for name in names:
+        print '-' * 25
+        print 'name:', name.name
+
+    q = session.query(AssetDataVariant)
+    variants = q.all()
+    print '=' * 80
+    print 'AssetDataVariant...'
+    for variant in variants:
+        print '-' * 25
+        print 'name:', variant.name
+
+    q = session.query(AssetDataResolution)
+    resolutions = q.all()
+    print '=' * 80
+    print 'AssetDataResolutions...'
+    for resolution in resolutions:
+        print '-' * 25
+        print 'name:', resolution.name
+
+    q = session.query(AssetDataInstance)
+    instances = q.all()
+    print '=' * 80
+    print 'AssetDataInstances...'
+    for instance in instances:
+        print '-' * 25
+        print 'name:', instance.name
+
+    q = session.query(AssetDataType)
+    types = q.all()
+    print '=' * 80
+    print 'AssetDataTypes...'
+    for type in types:
+        print '-' * 25
+        print 'name:', type.name
+
     q = session.query(AssetData)
     assetdatas = q.all()
     print '=' * 80
@@ -1031,68 +1169,80 @@ def queryAssetDatas(session):
     print 'AssetDataVersions...'
     for ver in versions:
         print '-' * 25
+        print 'asset_data:', ver.asset_data
+        print 'task:', ver.task
+        print 'media_version:', ver.media_version
         print 'version:', ver.version
         print 'revision:', ver.revision
         print 'approved:', ver.approved
         print 'frozen:', ver.frozen
 
-    # print '=' * 80
-    # print 'Asset Tree...'
-    # indent = 0
-    # space = '  '
-    # projs = session.query(Project).all()
-    # for proj in projs:
-    #     print (space * indent) + 'Project:', proj
-    #     indent = 1
-    #
-    #     shots = session.query(Shot).filter(Project.id == proj.id).all()
-    #     for shot in shots:
-    #         indent = 2
-    #         print (space * indent) + 'Shot:', shot
-    #         q = session.query(AssetData).filter(Shot.id == shot.id)
-    #         assetdatas = q.all()
-    #         for assetdata in assetdatas:
-    #             indent = 3
-    #             x = (space * indent)
-    #             print x + 'AssetData:', assetdata
-    #             # print x + ' > name:', assetdata.asset_data_name.name
-    #             # print x + ' > subname:', assetdata.asset_data_subname.name
-    #             # print x + ' > variant:', assetdata.asset_data_variant.name
-    #             # print x + ' > instance:', assetdata.asset_data_instance.name
-    #             # print x + ' > resolution:', assetdata.asset_data_resolution.name
-    #             # print x + ' > type:', assetdata.asset_data_type.name
-    #
-    #             q = session.query(AssetDataVersion).filter(AssetData.id == assetdata.id)
-    #             assetdatavers = q.all()
-    #             for assetdataver in assetdatavers:
-    #                 indent = 4
-    #                 if assetdataver.approved:
-    #                     print (space * indent) + 'AssetDataVersion:', assetdataver
-    #
-    #     assets = session.query(Asset).filter(Project.id == proj.id).all()
-    #     for asset in assets:
-    #         indent = 2
-    #         print (space * indent) + 'Asset:', asset
-    #
-    #         q = session.query(AssetData).filter(Asset.id == asset.id)
-    #         assetdatas = q.all()
-    #         for assetdata in assetdatas:
-    #             indent = 3
-    #             x = (space * indent)
-    #             print x + 'AssetData:', assetdata
-    #             # print x + ' > name:', assetdata.asset_data_name.name
-    #             # print x + ' > subname:', assetdata.asset_data_subname.name
-    #             # print x + ' > variant:', assetdata.asset_data_variant.name
-    #             # print x + ' > instance:', assetdata.asset_data_instance.name
-    #             # print x + ' > resolution:', assetdata.asset_data_resolution.name
-    #             # print x + ' > type:', assetdata.asset_data_type.name
-    #
-    #             q = session.query(AssetDataVersion).filter(AssetData.id == assetdata.id)
-    #             assetdatavers = q.all()
-    #             for assetdataver in assetdatavers:
-    #                 indent = 4
-    #                 if assetdataver.approved:
-    #                     print (space * indent) + 'AssetDataVersion:', assetdataver
+    print '=' * 80
+    print 'Asset Tree...'
+    indent = 0
+    space = '  '
+    projs = session.query(Project).all()
+    for proj in projs:
+        print (space * indent) + 'Project:', proj
+        indent = 1
+
+        shots = session.query(Shot) \
+            .join(Shot.sequence, Sequence.project) \
+            .filter(Sequence.project_id == proj.id).all()
+        for shot in shots:
+            indent = 2
+            print (space * indent) + 'Shot:', shot
+            q = session.query(AssetData).filter(AssetData.shot_id == shot.id)
+            assetdatas = q.all()
+            for assetdata in assetdatas:
+                indent = 3
+                x = (space * indent)
+                print x + 'AssetData:', assetdata
+                print x + ' > name:', assetdata.asset_data_name.name
+                print x + ' > subname:', assetdata.asset_data_subname.name
+                print x + ' > variant:', assetdata.asset_data_variant.name
+                print x + ' > instance:', assetdata.asset_data_instance.name
+                print x + ' > resolution:', assetdata.asset_data_resolution.name
+                print x + ' > type:', assetdata.asset_data_type.name
+
+                q = session.query(AssetDataVersion) \
+                    .join(AssetDataVersion.asset_data) \
+                    .filter(AssetData.id == assetdata.id)
+                assetdatavers = q.all()
+                for assetdataver in assetdatavers:
+                    indent = 4
+                    if assetdataver.approved:
+                        print (space * indent) + 'AssetDataVersion:', assetdataver
+
+        assets = session.query(Asset) \
+            .join(Asset.project) \
+            .filter(Asset.project_id == proj.id).all()
+        for asset in assets:
+            indent = 2
+            print (space * indent) + 'Asset:', asset
+
+            q = session.query(AssetData).filter(AssetData.asset_id == asset.id)
+            assetdatas = q.all()
+            for assetdata in assetdatas:
+                indent = 3
+                x = (space * indent)
+                print x + 'AssetData:', assetdata
+                print x + ' > name:', assetdata.asset_data_name.name
+                print x + ' > subname:', assetdata.asset_data_subname.name
+                print x + ' > variant:', assetdata.asset_data_variant.name
+                print x + ' > instance:', assetdata.asset_data_instance.name
+                print x + ' > resolution:', assetdata.asset_data_resolution.name
+                print x + ' > type:', assetdata.asset_data_type.name
+
+                q = session.query(AssetDataVersion) \
+                    .join(AssetDataVersion.asset_data) \
+                    .filter(AssetData.id == assetdata.id)
+                assetdatavers = q.all()
+                # print 'assetdatavers:', assetdatavers
+                for assetdataver in assetdatavers:
+                    indent = 4
+                    if assetdataver.approved:
+                        print (space * indent) + 'AssetDataVersion:', assetdataver
     return
 
 
@@ -1101,37 +1251,29 @@ def main():
     engine = create_engine(url, echo=setup.ECHO)
     session = setup.get_session()
 
-    tablebase.dropTables(engine)
-    tablebase.createTables(engine)
+    base.dropTables(engine)
+    base.createTables(engine)
 
     createUsers(session)
-    queryUsers(session)
-
     createTasks(session)
-    queryTasks(session)
-
     createConfigFiles(session)
-    queryConfigFiles(session)
-
     createProjects(session)
-    queryProjects(session)
-
     createAssets(session)
-    queryAssets(session)
-
     createSequences(session)
-    querySequences(session)
-
     createScenes(session)
-    queryScenes(session)
-
     createShots(session)
-    queryShots(session)
-
-    createMedia(session)
-    queryMedia(session)
-
+    createMediaVersions(session)
     createAssetDatas(session)
+
+    queryUsers(session)
+    queryTasks(session)
+    queryConfigFiles(session)
+    queryProjects(session)
+    queryAssets(session)
+    querySequences(session)
+    queryScenes(session)
+    queryShots(session)
+    queryMediaVersions(session)
     queryAssetDatas(session)
 
 
