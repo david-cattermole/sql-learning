@@ -172,5 +172,5 @@ class Asset(base.Base, mixins.IdentityMixin, mixins.CreatedUpdatedMixin):
     # asset_datas = relationship('AssetData')
 
     def __init__(self, **kwargs):
-        super(AssetCategory, self).__init__()
+        super(Asset, self).__init__()
         self._setKeywordFields(**kwargs)
