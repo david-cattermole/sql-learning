@@ -9,8 +9,6 @@ import getpass
 from collections import defaultdict
 from sqlalchemy import create_engine
 
-path = 'U:/Windows_Dev/sql-learning/assetDB/python'
-sys.path.insert(0, os.path.abspath(path))
 import assetDB.setup as setup
 import assetDB.models.modelbase as base
 from assetDB.models import *
