@@ -1,0 +1,8 @@
+{
+  "drivername": "postgres",
+  "host": "<hostname>",
+  "port": 5432,
+  "username": "<user name>",
+  "password": "<password>",
+  "database": "<database name>"
+}
