@@ -1,0 +1,13 @@
+{
+  "includes": [
+    "\\\\HOSTNAME\\Music",
+    "\\\\HOSTNAME\\Software",
+    "\\\\HOSTNAME\\Tutorials",
+    "\\\\HOSTNAME\\Projects",
+    "\\\\HOSTNAME\\Videos"
+  ],
+  "excludes": [
+    "\\\\HOSTNAME\\Music\\albumArt",
+    "\\\\HOSTNAME\\Music\\lyrics"
+  ]
+}
