@@ -1,3 +1,0 @@
-"""
-Asset Database example.
-"""

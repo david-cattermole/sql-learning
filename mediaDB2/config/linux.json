@@ -1,9 +1,0 @@
-{
-  "includes": [
-    "/data/"
-  ],
-  "excludes": [
-    "/data/Music/albumArt",
-    "/data/Music/lyrics"
-  ]
-}

@@ -1,8 +1,0 @@
-{
-  "drivername": "mysql",
-  "host": "<host name>",
-  "port": 3306,
-  "username": "<user name>",
-  "password": "<password>",
-  "database": "<database name>"
-}
