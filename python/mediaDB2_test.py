@@ -238,7 +238,7 @@ def main():
         base.dropTables(engine)
         base.createTables(engine)
 
-    session = setup.get_session(autoflush=False)
+    session = setup.get_session()
 
     # Find Media
     includes = config.getIncludePaths()
