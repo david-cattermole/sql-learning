@@ -1,6 +1,10 @@
 {
   "includes": [
-    "/data/"
+    "/data/Music",
+    "/data/Software",
+    "/data/Tutorials",
+    "/data/projects",
+    "/data/Videos"
   ],
   "excludes": [
     "/data/Music/albumArt",
