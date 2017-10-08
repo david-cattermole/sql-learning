@@ -36,6 +36,9 @@ UNNEEDED_WORDS = config.getExcludedWords()
 def getAllMounts():
     mounts = {}
     if os.name == 'nt':
+        # TODO: For windows, we need to get the 'mount points' so we can use
+        # them in the same way as on Linux.
+
         # import win32api
         #
         # drives = win32api.GetLogicalDriveStrings()
@@ -90,11 +93,14 @@ MOUNTS = getAllMounts()
 
 def getMount(mounts, path):
     mount = None
-    for d in mounts.keys():
+    mount_dir = None
+    keys = reversed(sorted(mounts.keys()))
+    for d in keys:
         if path.startswith(d) is True:
             mount = mounts[d]
+            mount_dir = d
             break
-    return mount
+    return mount_dir, mount
 
 
 def createRepo(session, mount):
@@ -185,73 +191,81 @@ def createMime(session, path):
     return mime_obj
 
 
-def loopFiles(session, files, dirpath, exclude, parent_dir):
-    paths = []
-    for filename in files:
-        if filename.startswith('.'):
-            continue
-        if filename.startswith('@'):
-            continue
-        if filename.endswith('#'):
-            continue
-        if filename.endswith('~'):
-            continue
+def addPath(session, full_path, parent_path):
+    # Repository
+    repository = None
+    mount_dir, mount = getMount(MOUNTS, full_path)
+    if mount:
+        repository = createRepo(session, mount)
+    session.add(repository)
 
-        full_path = os.path.abspath(os.path.join(dirpath, filename))
-        if not os.path.isfile(full_path):
-            continue
+    # Get the final end_path
+    end_path = full_path[len(mount_dir):]
+    end_path = end_path.encode('ascii', errors='ignore')
+    if len(end_path.strip()) == 0:
+        return None
 
-        if exclude is not None:
-            ok = True
-            for ex in exclude:
-                if full_path.startswith(ex):
-                    ok = False
-                    break
-            if ok is False:
-                continue
+    # Query an existing Path
+    q = session.query(Path)
+    q = q.filter(Path.path == end_path)
+    p = q.first()
 
+    # Path
+    extension = None
+    if os.path.isdir(full_path):
+        if p is None:
+            p = Path(path=end_path)
+        p.is_file = False
+        p.file_size = None
+        p.mime = None
+
+    elif os.path.isfile(full_path):
         # Size
+        size = 0
         try:
             size = os.path.getsize(full_path)
-        except:
-            size = 0
+        except OSError:
+            pass
 
         # MIME type
         mime = createMime(session, full_path)
-        session.commit()
-
-        # Repository
-        mount = getMount(MOUNTS, full_path)
-        repository = None
-        if mount:
-            repository = createRepo(session, mount)
-        session.commit()
 
         # Path
-        p = Path(path=full_path, is_file=True, file_size=size)
+        if p is None:
+            p = Path(path=end_path)
+        p.is_file = True
+        p.file_size = size
         p.mime = mime
-        p.repository = repository
-        p.parent = parent_dir
-        paths.append(p)
 
         # File Extension
         n, ext = os.path.splitext(full_path)
         extension = ext[1:].lower()
 
-        # Tags
-        path = full_path[len(dirpath):]  # Only use file name for tags.
-        tag_names = createTags(path, extension)
-        for name in tag_names:
-            tag = session.query(Tag).filter_by(name=name).first()
-            if tag is None:
-                tag = Tag(name=name)
-                session.add(tag)
+    # Parent directory
+    if parent_path is not None:
+        p.parent = parent_path
+
+    # Repository
+    p.repository = repository
+
+    # Tags
+    # NOTE: Only use file name for tags.
+    dir_path, file_name = os.path.split(full_path)
+    tag_names = createTags(file_name, extension)
+    for name in tag_names:
+        tag = session.query(Tag).filter_by(name=name).first()
+        if tag is None:
+            tag = Tag(name=name)
+            session.add(tag)
+
+        pt = session.query(PathTag).filter_by(tag_id=tag.id, path_id=p.id).first()
+        if pt is None:
             pt = PathTag(tag=tag, path=p)
-            p.path_tags.append(pt)
+        p.path_tags.append(pt)
+        session.add(pt)
 
-        session.commit()
-
-    return paths
+    session.add(p)
+    return p
 
 
 def printDots(c):
@@ -264,72 +278,79 @@ def printDots(c):
     return c
 
 
-def findMedia(session, root_path, excludes=None):
-    c = 0
+def findMedia(session, root_path, exclude_paths=None):
     num = 0
-    root_dir_objs = {}
+    c = 0
     for root, dirs, files in os.walk(root_path, topdown=True, followlinks=False):
-        # TODO: On Windows, get proper 'repo' path. Something like
-        # "\\HEARTOFGOLD\Music".
+        dir_path, name = os.path.split(root)
+        if name.startswith('.'):
+            continue
+        if name.startswith('@'):
+            continue
+        if name.endswith('#'):
+            continue
+        if name.endswith('~'):
+            continue
 
-        # Repository
-        mount = getMount(MOUNTS, root)
-        repository = None
-        if mount:
-            repository = createRepo(session, mount)
-        session.add_all([repository])
-
-        d = None
-        if root not in root_dir_objs:
-            d = Path(path=root, is_file=False)
-            root_dir_objs[root] = d
-            session.add(d)
-            num += 1
-            c += 1
-        else:
-            d = root_dir_objs[root]
-
-        paths = loopFiles(session, files, root, excludes, d)
-        num_paths = len(paths)
-        num += num_paths
-        c += num_paths
-
-        session.add_all(paths)
+        # Add 'root' path
+        parent_path = addPath(session, root, None)
+        c += 1
+        num += 1
         session.commit()
 
-        c = printDots(c)
-
-        for dirname in dirs:
-            if dirname.startswith('.'):
+        for d in dirs:
+            if d.startswith('.'):
                 continue
-            if dirname.startswith('@'):
+            if d.startswith('@'):
                 continue
-            if dirname.endswith('#'):
+            if d.endswith('#'):
                 continue
-            if dirname.endswith('~'):
+            if d.endswith('~'):
                 continue
 
-            files = []
-            dirpath = os.path.abspath(os.path.join(root, dirname))
-            if os.path.isdir(dirpath):
-                d = Path(path=dirpath, is_file=False)
-                session.add(d)
-                num += 1
-                c += 1
+            path = os.path.abspath(os.path.realpath(os.path.join(root, d)))
 
-                try:
-                    files = os.listdir(dirpath)
-                except:
+            if exclude_paths is not None:
+                ok = True
+                for ex in exclude_paths:
+                    if path.startswith(ex):
+                        ok = False
+                        break
+                if ok is False:
                     continue
 
-                paths = loopFiles(session, files, dirpath, excludes, d)
-                num_paths = len(paths)
-                num += num_paths
-                c += num_paths
-                session.add_all(paths)
-                session.commit()
+            addPath(session, path, parent_path)
+            session.commit()
+            num += 1
+            c += 1
 
-                c = printDots(c)
+        for f in files:
+            if f.startswith('.'):
+                continue
+            if f.startswith('@'):
+                continue
+            if f.endswith('#'):
+                continue
+            if f.endswith('~'):
+                continue
+
+            path = os.path.abspath(os.path.realpath(os.path.join(root, f)))
+
+            if exclude_paths is not None:
+                ok = True
+                for ex in exclude_paths:
+                    if path.startswith(ex):
+                        ok = False
+                        break
+                if ok is False:
+                    continue
+
+            addPath(session, path, parent_path)
+            session.commit()
+            c += 1
+            num += 1
+
+        c = printDots(c)
 
     return num
 

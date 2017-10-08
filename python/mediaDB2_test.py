@@ -17,14 +17,19 @@ def main():
     # print 'args', sys.argv
     reset_tables = False
     if len(sys.argv) > 1:
-        reset_tables = bool(str(sys.argv[1]))
-    print 'reset_tables:', reset_tables
+        if str(sys.argv[1]).lower() == 'false':
+            reset_tables = False
+        elif str(sys.argv[1]).lower() == 'true':
+            reset_tables = True
+        else:
+            reset_tables = bool(int(sys.argv[1]))
 
     url = setup.get_database_url()
     engine = create_engine(url, echo=setup.ECHO)
 
     # Reset Tables
     if reset_tables is True:
+        print 'Resetting Tables...'
         base.dropTables(engine)
         base.createTables(engine)
 
@@ -37,7 +42,7 @@ def main():
         print 'Find Media...', path
         s = time.time()
 
-        num = mediaDB2.utils.findMedia(session, path, excludes=excludes)
+        num = mediaDB2.utils.findMedia(session, path, exclude_paths=excludes)
 
         e = time.time()
         total = e - s
@@ -51,6 +56,7 @@ def main():
         print 'Per-Insert Time = %.4g seconds' % per_total
         print 'Total Time = %.4g seconds' % total
         print 'Finished.'
+        print '=' * 80
 
 
 if __name__ == '__main__':

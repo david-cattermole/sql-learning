@@ -462,7 +462,12 @@ def main():
     # print 'args', sys.argv
     reset_tables = False
     if len(sys.argv) > 1:
-        reset_tables = bool(str(sys.argv[1]))
+        if str(sys.argv[1]).lower() == 'false':
+            reset_tables = False
+        elif str(sys.argv[1]).lower() == 'true':
+            reset_tables = True
+        else:
+            reset_tables = bool(int(sys.argv[1]))
 
     url = setup.get_database_url()
     engine = create_engine(url, echo=setup.ECHO)

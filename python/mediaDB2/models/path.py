@@ -5,7 +5,7 @@ File Data database tables
 from sqlalchemy import (
     Column, Integer, BigInteger, String, Boolean, ForeignKey
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.collections import attribute_mapped_collection
 
 import mediaDB2.config as config
@@ -56,15 +56,16 @@ class Path(base.Base, mixins.IdentityMixin):
         'Path',
 
         # TODO: Try to get the 'parent' relationship working.
-        # # many to one + adjacency list - remote_side
-        # # is required to reference the 'remote'
-        # # column in the join condition.
-        # backref=backref(
-        #     'parent',
-        #     remote_side='Path.id',
-        #     single_parent=True,
-        #     cascade='save-update, merge, delete, delete-orphan'
-        # ),
+
+        # many to one + adjacency list - remote_side
+        # is required to reference the 'remote'
+        # column in the join condition.
+        backref=backref(
+            'parent',
+            remote_side='Path.id',
+            single_parent=True,
+            cascade='save-update, merge, delete, delete-orphan'
+        ),
 
         # children will be represented as a dictionary
         # on the "name" attribute.
