@@ -10,7 +10,7 @@ import mediaDB2.config as config
 
 # Default database type
 # 'mysql' or 'postgres'
-DB_TYPE = 'postgres'
+DB_TYPE = 'mysql'
 ECHO = False
 
 
@@ -22,7 +22,7 @@ def get_database_url(dbtype=None):
     return url
 
 
-def get_session(dbtype=None, echo=None):
+def get_session(dbtype=None, echo=None, autoflush=True):
     if dbtype is None:
         dbtype = DB_TYPE
     if echo is None:
@@ -30,6 +30,6 @@ def get_session(dbtype=None, echo=None):
     url = get_database_url(dbtype)
     print 'URL:', url
     engine = create_engine(url, echo=echo)
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=engine, autoflush=autoflush)
     return Session()
 

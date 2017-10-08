@@ -56,12 +56,14 @@ import os
 import os.path
 import sys
 import time
+import pprint
 
 from sqlalchemy import create_engine
 
 import mediaDB2.config as config
-import mediaDB2.models.path
 import mediaDB2.setup as setup
+import mediaDB2.models.modelbase as base
+import mediaDB2.models.path
 from mediaDB2.models import *
 
 # initialise mimetypes with user-defined values.
@@ -70,6 +72,7 @@ mimetypes.init(mime_files)
 
 SPLIT_CHARS = config.getSplitChars()
 UNNEEDED_WORDS = config.getExcludedWords()
+MOUNTS = mediaDB2.models.path.getAllMounts()
 
 
 def loopFiles(session, files, dirpath, exclude, parent_dir):
@@ -104,13 +107,20 @@ def loopFiles(session, files, dirpath, exclude, parent_dir):
             size = 0
 
         # MIME type
-        mime_type, mime_subtype = mediaDB2.models.path.createMime(session, full_path)
+        mime = mediaDB2.models.path.createMime(session, full_path)
+        session.commit()
+
+        # Repository
+        mount = mediaDB2.models.path.getMount(MOUNTS, full_path)
+        repository = None
+        if mount:
+            repository = mediaDB2.models.path.createRepo(session, mount)
+        session.commit()
 
         # Path
-
-        p = Path(path=full_path, is_file=True, file_size=size,
-                 mime_type=mime_type,
-                 mime_subtype=mime_subtype)
+        p = Path(path=full_path, is_file=True, file_size=size)
+        p.mime = mime
+        p.repository = repository
         p.parent = parent_dir
         paths.append(p)
 
@@ -129,6 +139,8 @@ def loopFiles(session, files, dirpath, exclude, parent_dir):
             pt = PathTag(tag=tag, path=p)
             p.path_tags.append(pt)
 
+        session.commit()
+
     return paths
 
 
@@ -143,17 +155,18 @@ def printDots(c):
 
 
 def findMedia(session, root_path, excludes=None):
-    # all_paths = []
-
-    # d = Path(path=root_path, is_file=False)
-    # session.add(d)
-
     c = 0
     num = 0
     root_dir_objs = {}
     for root, dirs, files in os.walk(root_path, topdown=True, followlinks=False):
         # TODO: Get proper 'repo' path. Something like "\\HEARTOFGOLD\Music".
-        repo_path = root
+
+        # Repository
+        mount = mediaDB2.models.path.getMount(MOUNTS, root)
+        repository = None
+        if mount:
+            repository = mediaDB2.models.path.createRepo(session, mount)
+        session.add_all([repository])
 
         d = None
         if root not in root_dir_objs:
@@ -215,6 +228,7 @@ def main():
     reset_tables = False
     if len(sys.argv) > 1:
         reset_tables = bool(str(sys.argv[1]))
+    print 'reset_tables:', reset_tables
 
     url = setup.get_database_url()
     engine = create_engine(url, echo=setup.ECHO)
@@ -224,7 +238,7 @@ def main():
         base.dropTables(engine)
         base.createTables(engine)
 
-    session = setup.get_session()
+    session = setup.get_session(autoflush=False)
 
     # Find Media
     includes = config.getIncludePaths()

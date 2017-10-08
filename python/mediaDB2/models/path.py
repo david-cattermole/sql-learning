@@ -2,6 +2,8 @@
 File Data database tables
 """
 
+import os
+import subprocess
 import mimetypes
 import re
 
@@ -19,11 +21,59 @@ from mediaDB2.models import modelbase as base
 files = config.getMimeFilePaths()
 mimetypes.init(files)
 
-MIME_TYPE_OBJS = {}
-MIME_SUBTYPE_OBJS = {}
-
 SPLIT_CHARS = config.getSplitChars()
 UNNEEDED_WORDS = config.getExcludedWords()
+
+
+def getAllMounts():
+    mounts = {}
+    if os.name == 'nt':
+        return mounts
+    lines = subprocess.check_output(['mount', '-l']).split('\n')
+    for line in lines:
+        parts = line.split(' ')
+        if len(parts) > 2:
+            repo = parts[0]
+            directory = parts[2]
+            typ = parts[4]
+
+            hostname = ''
+            share = ''
+            if ':' in repo:
+                splt = repo.split(':')
+                hostname = splt[0]
+                share = splt[1]
+
+            mounts[directory] = {
+                'repo': repo,
+                'hostname': hostname,
+                'share': share,
+                'type': typ,
+            }
+    return mounts
+
+
+def getMount(mounts, path):
+    mount = None
+    for d in mounts.keys():
+        if path.startswith(d) is True:
+            mount = mounts[d]
+            break
+    return mount
+
+
+def createRepo(session, mount):
+    hostname = mount['hostname']
+    share = mount['share']
+
+    q = session.query(Repository)
+    q = q.filter(Repository.host_name == hostname, Repository.share_name == share)
+    repo = q.first()
+
+    if repo is None:
+        repo = Repository(host_name=hostname, share_name=share)
+        session.add(repo)
+    return repo
 
 
 def createTags(path, file_ext):
@@ -60,11 +110,7 @@ def createTags(path, file_ext):
 
 
 def createMime(session, path):
-    global MIME_TYPE_OBJS
-    global MIME_SUBTYPE_OBJS
-
-    mime_type = None
-    mime_subtype = None
+    mime_obj = None
 
     mime = mimetypes.guess_type(path, strict=False)
     if mime and len(mime) == 2 and mime[0]:
@@ -72,27 +118,62 @@ def createMime(session, path):
         type_name = tmp[0]
         subtype_name = tmp[1]
 
-        if type_name not in MIME_TYPE_OBJS:
-            q_type = session.query(MimeType).filter(MimeType.name == type_name)
+        # Query Mime
+        q_mime = session.query(Mime).join(MimeType, MimeSubtype)
+        q_mime = q_mime.filter(MimeType.name == type_name,
+                               MimeSubtype.name == subtype_name)
+        mime_obj = q_mime.first()
+        if mime_obj is None:
+            # Mime Type
+            q_type = session.query(MimeType)
+            q_type = q_type.filter(MimeType.name == type_name)
             mime_type = q_type.first()
-            if mime_type is not None:
-                MIME_TYPE_OBJS[type_name] = mime_type
-        else:
-            mime_type = MIME_TYPE_OBJS[type_name]
-        if mime_type is None:
-            mime_type = MimeType(name=type_name)
+            if mime_type is None:
+                mime_type = MimeType(name=type_name)
+                session.add(mime_type)
 
-        if subtype_name not in MIME_SUBTYPE_OBJS:
-            q_subtype = session.query(MimeSubtype).filter(MimeSubtype.name == subtype_name)
+            # Mime Sub-type
+            q_subtype = session.query(MimeSubtype)
+            q_subtype = q_subtype.filter(MimeSubtype.name == subtype_name)
             mime_subtype = q_subtype.first()
-            if mime_subtype is not None:
-                MIME_SUBTYPE_OBJS[subtype_name] = mime_subtype
-        else:
-            mime_subtype = MIME_SUBTYPE_OBJS[subtype_name]
-        if mime_subtype is None:
-            mime_subtype = MimeSubtype(name=subtype_name)
+            if mime_subtype is None:
+                mime_subtype = MimeSubtype(name=subtype_name)
+                session.add(mime_subtype)
 
-    return mime_type, mime_subtype
+            # Mime Object
+            mime_obj = Mime(
+                mime_type=mime_type,
+                mime_subtype=mime_subtype
+            )
+            session.add(mime_obj)
+
+    return mime_obj
+
+
+class Repository(base.Base, mixins.IdentityMixin):
+    __tablename__ = 'repository'
+    __mapper_args__ = {
+        'polymorphic_identity': 'Repository',
+    }
+
+    host_name = Column(
+        'host_name',
+        String(base.NAME_LENGTH),
+        nullable=False,
+        unique=False,
+    )
+
+    share_name = Column(
+        'share_name',
+        String(base.NAME_LENGTH),
+        nullable=False,
+        unique=False,
+    )
+
+    def __init__(self, **kwargs):
+        super(Repository, self).__init__()
+        self._setKeywordFields(**kwargs)
+        return
 
 
 class Path(base.Base, mixins.IdentityMixin):
@@ -127,6 +208,19 @@ class Path(base.Base, mixins.IdentityMixin):
         collection_class=attribute_mapped_collection('path'),
     )
 
+    repository_id = Column(
+        'repository_id',
+        Integer,
+        ForeignKey('repository.id'),
+        nullable=True,
+        unique=False,
+    )
+
+    repository = relationship(
+        'Repository',
+        foreign_keys=[repository_id]
+    )
+
     # TODO: Separate this field into a 'repo' field as well as path, this means
     # we can change the sever and share that the file exist on by just updating
     # one (repo) field.
@@ -134,7 +228,7 @@ class Path(base.Base, mixins.IdentityMixin):
         'path',
         String(base.NAME_LENGTH),
         nullable=False,
-        unique=False,  # TOOD: Turn this back on and make sure tests don't fail this.
+        unique=False,  # TODO: Turn this back on and make sure tests don't fail this.
     )
 
     is_file = Column(
@@ -144,20 +238,17 @@ class Path(base.Base, mixins.IdentityMixin):
         unique=False,
     )
 
-    mime_type_id = Column(
-        'mime_type_id',
+    mime_id = Column(
+        'mime_id',
         Integer,
-        ForeignKey('mime_type.id'),
+        ForeignKey('mime.id'),
         nullable=True,
         unique=False,
     )
 
-    mime_subtype_id = Column(
-        'mime_subtype_id',
-        Integer,
-        ForeignKey('mime_subtype.id'),
-        nullable=True,
-        unique=False,
+    mime = relationship(
+        'Mime',
+        foreign_keys=[mime_id]
     )
 
     file_size = Column(
@@ -170,10 +261,6 @@ class Path(base.Base, mixins.IdentityMixin):
     path_tags = relationship(
         'PathTag',
     )
-
-    mime_type = relationship('MimeType')
-
-    mime_subtype = relationship('MimeSubtype')
 
     def __init__(self, **kwargs):
         super(Path, self).__init__()
@@ -229,6 +316,37 @@ class Tag(base.Base, mixins.IdentityMixin):
 
     def __init__(self, **kwargs):
         super(Tag, self).__init__()
+        self._setKeywordFields(**kwargs)
+
+
+class Mime(base.Base, mixins.IdentityMixin):
+    __tablename__ = 'mime'
+    __mapper_args__ = {
+        'polymorphic_identity': 'Mime',
+    }
+
+    mime_type_id = Column(
+        'mime_type_id',
+        Integer,
+        ForeignKey('mime_type.id'),
+        nullable=True,
+        unique=False,
+    )
+
+    mime_subtype_id = Column(
+        'mime_subtype_id',
+        Integer,
+        ForeignKey('mime_subtype.id'),
+        nullable=True,
+        unique=False,
+    )
+
+    mime_type = relationship('MimeType')
+
+    mime_subtype = relationship('MimeSubtype')
+
+    def __init__(self, **kwargs):
+        super(Mime, self).__init__()
         self._setKeywordFields(**kwargs)
 
 
