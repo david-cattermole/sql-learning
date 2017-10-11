@@ -1,5 +1,5 @@
 """
-
+The starting session for any database usage.
 """
 
 from sqlalchemy import create_engine
@@ -10,7 +10,7 @@ import mediaDB2.config as config
 
 # Default database type
 # 'mysql' or 'postgres'
-DB_TYPE = 'mysql'
+DB_TYPE = 'postgres'
 ECHO = False
 
 
