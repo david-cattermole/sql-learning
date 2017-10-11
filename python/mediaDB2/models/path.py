@@ -1,6 +1,7 @@
 """
 File Data database tables
 """
+import os
 
 from sqlalchemy import (
     Column, Integer, BigInteger, String, Boolean, ForeignKey
@@ -8,9 +9,23 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm.collections import attribute_mapped_collection
 
-import mediaDB2.config as config
+import mediaDB2.mounts
 from mediaDB2.models import mixins
 from mediaDB2.models import modelbase as base
+
+
+def convertRepoToPath(mounts, repo):
+    repo_host_name = repo.host_name
+    repo_share_name = repo.share_name
+    path = '/'
+    keys = reversed(sorted(mounts.keys()))
+    for k in keys:
+        hostname = mounts[k]['hostname']
+        share = mounts[k]['share']
+        if repo_host_name == hostname and repo_share_name == share:
+            path = k
+            break
+    return path
 
 
 class Repository(base.Base, mixins.IdentityMixin):
@@ -37,6 +52,13 @@ class Repository(base.Base, mixins.IdentityMixin):
         super(Repository, self).__init__()
         self._setKeywordFields(**kwargs)
         return
+
+    def get_path(self):
+        mounts = mediaDB2.mounts.MOUNTS
+        repo_path = convertRepoToPath(mounts, self)
+        return repo_path
+
+    path = property(get_path)
 
 
 class Path(base.Base, mixins.IdentityMixin):
@@ -132,6 +154,16 @@ class Path(base.Base, mixins.IdentityMixin):
         kwargs['path'] = kwargs['path'].encode('ascii', errors='ignore')
         self._setKeywordFields(**kwargs)
         return
+
+    def get_full_path(self):
+        # repo = self.repository
+        # mounts = mediaDB2.utils.MOUNTS
+        # repo_path = mediaDB2.utils.convertRepoToPath(mounts, repo)
+        repo_path = self.repository.path
+        path = self.path
+        return os.path.join(repo_path, path)
+
+    full_path = property(get_full_path)
 
 
 class PathTag(base.Base):
