@@ -5,23 +5,13 @@ File Data database tables
 import os
 import os.path
 import sys
-import subprocess
 import mimetypes
 import re
-import time
 
-from sqlalchemy import (
-    Column, Integer, BigInteger, String, Boolean, ForeignKey
-)
-from sqlalchemy import create_engine
-from sqlalchemy.orm import relationship
-from sqlalchemy.orm.collections import attribute_mapped_collection
+import enchant
 
 import mediaDB2.config as config
-import mediaDB2.setup as setup
-import mediaDB2.models.modelbase as base
-import mediaDB2.models.path
-import mediaDB2.models.mixins as mixins
+import mediaDB2.mounts
 from mediaDB2.models import *
 
 
@@ -33,79 +23,13 @@ SPLIT_CHARS = config.getSplitChars()
 UNNEEDED_WORDS = config.getExcludedWords()
 
 
-def getAllMounts():
-    mounts = {}
-    if os.name == 'nt':
-        # TODO: For windows, we need to get the 'mount points' so we can use
-        # them in the same way as on Linux.
-
-        # import win32api
-        #
-        # drives = win32api.GetLogicalDriveStrings()
-        # drives = drives.split('\000')[:-1]
-        # print drives
-
-        ########################################################################
-
-        # import string
-        # from ctypes import windll
-        #
-        # def get_drives():
-        #     drives = []
-        #     bitmask = windll.kernel32.GetLogicalDrives()
-        #     for letter in string.uppercase:
-        #         if bitmask & 1:
-        #             drives.append(letter)
-        #         bitmask >>= 1
-        #
-        #     return drives
-        #
-        # if __name__ == '__main__':
-        #     print get_drives()  # On my PC, this prints ['A', 'C', 'D', 'F', 'H']
-
-        return mounts
-    lines = subprocess.check_output(['mount', '-l']).split('\n')
-    for line in lines:
-        parts = line.split(' ')
-        if len(parts) > 2:
-            repo = parts[0]
-            directory = parts[2]
-            typ = parts[4]
-
-            hostname = ''
-            share = ''
-            if ':' in repo:
-                splt = repo.split(':')
-                hostname = splt[0]
-                share = splt[1]
-
-            mounts[directory] = {
-                'repo': repo,
-                'hostname': hostname,
-                'share': share,
-                'type': typ,
-            }
-    return mounts
-
-
-MOUNTS = getAllMounts()
-
-
-def getMount(mounts, path):
-    mount = None
-    mount_dir = None
-    keys = reversed(sorted(mounts.keys()))
-    for d in keys:
-        if path.startswith(d) is True:
-            mount = mounts[d]
-            mount_dir = d
-            break
-    return mount_dir, mount
-
-
 def createRepo(session, mount):
     hostname = mount['hostname']
     share = mount['share']
+    if isinstance(hostname, basestring) and len(hostname) == 0:
+        return None
+    if isinstance(share, basestring) and len(share) == 0:
+        return None
 
     q = session.query(Repository)
     q = q.filter(Repository.host_name == hostname, Repository.share_name == share)
@@ -117,7 +41,10 @@ def createRepo(session, mount):
     return repo
 
 
-def createTags(path, file_ext):
+SPELLER = enchant.Dict()
+
+
+def createTagNames(path, file_ext, speller):
     split = path.strip()
 
     for char in SPLIT_CHARS:
@@ -145,6 +72,9 @@ def createTags(path, file_ext):
             continue
         if tag == file_ext:
             continue
+        if speller is not None:
+            if speller.check(tag) is False:
+                continue
         if tag not in the_tags:
             the_tags.append(tag)
     return the_tags
@@ -194,15 +124,24 @@ def createMime(session, path):
 def addPath(session, full_path, parent_path):
     # Repository
     repository = None
-    mount_dir, mount = getMount(MOUNTS, full_path)
+    mount_dir, mount = mediaDB2.mounts.getMount(mediaDB2.mounts.MOUNTS, full_path)
     if mount:
         repository = createRepo(session, mount)
+    if repository is None:
+        msg = 'Warning: Could not create repository for file path, %r.'
+        print msg % full_path
+        return None
     session.add(repository)
 
     # Get the final end_path
     end_path = full_path[len(mount_dir):]
     end_path = end_path.encode('ascii', errors='ignore')
-    if len(end_path.strip()) == 0:
+    end_path_len = len(end_path.strip())
+    if end_path_len == 0:
+        return None
+    elif end_path_len > 255:
+        msg = 'Warning: File path exceeds allowed character length, %r.'
+        print msg % full_path
         return None
 
     # Query an existing Path
@@ -241,6 +180,11 @@ def addPath(session, full_path, parent_path):
         n, ext = os.path.splitext(full_path)
         extension = ext[1:].lower()
 
+    else:
+        msg = 'Warning: File path is invalid, %r.'
+        print msg % full_path
+        return None
+
     # Parent directory
     if parent_path is not None:
         p.parent = parent_path
@@ -251,7 +195,7 @@ def addPath(session, full_path, parent_path):
     # Tags
     # NOTE: Only use file name for tags.
     dir_path, file_name = os.path.split(full_path)
-    tag_names = createTags(file_name, extension)
+    tag_names = createTagNames(file_name, extension, SPELLER)
     for name in tag_names:
         tag = session.query(Tag).filter_by(name=name).first()
         if tag is None:
@@ -281,6 +225,7 @@ def printDots(c):
 def findMedia(session, root_path, exclude_paths=None):
     num = 0
     c = 0
+    paths = []
     for root, dirs, files in os.walk(root_path, topdown=True, followlinks=False):
         dir_path, name = os.path.split(root)
         if name.startswith('.'):
@@ -298,6 +243,7 @@ def findMedia(session, root_path, exclude_paths=None):
         num += 1
         session.commit()
 
+        # Get all the directories paths
         for d in dirs:
             if d.startswith('.'):
                 continue
@@ -319,11 +265,10 @@ def findMedia(session, root_path, exclude_paths=None):
                 if ok is False:
                     continue
 
-            addPath(session, path, parent_path)
-            session.commit()
             num += 1
-            c += 1
+            paths.append(path)
 
+        # Get all the file paths
         for f in files:
             if f.startswith('.'):
                 continue
@@ -345,10 +290,18 @@ def findMedia(session, root_path, exclude_paths=None):
                 if ok is False:
                     continue
 
-            addPath(session, path, parent_path)
+            num += 1
+            paths.append(path)
+
+        # Add paths to database
+        for path in paths:
+            parent = parent_path
+            if parent_path is not None:
+                if not path.startswith(parent_path.full_path):
+                    parent = None
+            addPath(session, path, parent)
             session.commit()
             c += 1
-            num += 1
 
         c = printDots(c)
 
