@@ -2,18 +2,23 @@
 File Data database tables
 """
 
+import mimetypes
 import os
 import os.path
-import sys
-import mimetypes
 import re
+import sys
+import time
 
 import enchant
 
+# from sqlalchemy import *
+
 import mediaDB2.config as config
 import mediaDB2.mounts
-from mediaDB2.models import *
-
+from mediaDB2.cache import memoized
+from mediaDB2.models import (
+    Path, Repository, MimeType, MimeSubtype, Mime, Tag, PathTag
+)
 
 # initialise mimetypes with user-defined values.
 mime_files = config.getMimeFilePaths()
@@ -22,29 +27,16 @@ mimetypes.init(mime_files)
 SPLIT_CHARS = config.getSplitChars()
 UNNEEDED_WORDS = config.getExcludedWords()
 
-
-def createRepo(session, mount):
-    hostname = mount['hostname']
-    share = mount['share']
-    if isinstance(hostname, basestring) and len(hostname) == 0:
-        return None
-    if isinstance(share, basestring) and len(share) == 0:
-        return None
-
-    q = session.query(Repository)
-    q = q.filter(Repository.host_name == hostname, Repository.share_name == share)
-    repo = q.first()
-
-    if repo is None:
-        repo = Repository(host_name=hostname, share_name=share)
-        session.add(repo)
-    return repo
-
-
 SPELLER = enchant.Dict()
 
 
-def createTagNames(path, file_ext, speller):
+@memoized
+def spelling_check(name):
+    return SPELLER.check(name)
+
+
+@memoized
+def createTagNames(path):
     split = path.strip()
 
     for char in SPLIT_CHARS:
@@ -70,14 +62,42 @@ def createTagNames(path, file_ext, speller):
             continue
         if tag in UNNEEDED_WORDS:
             continue
+
+        # File Extension
+        n, ext = os.path.splitext(path)
+        file_ext = ext[1:].lower()
         if tag == file_ext:
             continue
-        if speller is not None:
-            if speller.check(tag) is False:
-                continue
+
+        # Check Spelling
+        if not spelling_check(tag):
+            continue
+
+        # Add
         if tag not in the_tags:
             the_tags.append(tag)
     return the_tags
+
+
+def findRepo(session, hostname, share):
+    q = session.query(Repository)
+    q = q.filter(Repository.host_name == hostname, Repository.share_name == share)
+    repo = q.first()
+    return repo
+
+
+def createRepo(session, mount):
+    hostname = mount['hostname']
+    share = mount['share']
+    if isinstance(hostname, basestring) and len(hostname) == 0:
+        return None
+    if isinstance(share, basestring) and len(share) == 0:
+        return None
+
+    repo = findRepo(session, hostname, share)
+    if repo is None:
+        repo = Repository(host_name=hostname, share_name=share)
+    return repo
 
 
 def createMime(session, path):
@@ -176,10 +196,6 @@ def addPath(session, full_path, parent_path):
         p.file_size = size
         p.mime = mime
 
-        # File Extension
-        n, ext = os.path.splitext(full_path)
-        extension = ext[1:].lower()
-
     else:
         msg = 'Warning: File path is invalid, %r.'
         print msg % full_path
@@ -195,7 +211,7 @@ def addPath(session, full_path, parent_path):
     # Tags
     # NOTE: Only use file name for tags.
     dir_path, file_name = os.path.split(full_path)
-    tag_names = createTagNames(file_name, extension, SPELLER)
+    tag_names = createTagNames(file_name)
     for name in tag_names:
         tag = session.query(Tag).filter_by(name=name).first()
         if tag is None:
@@ -223,10 +239,12 @@ def printDots(c):
 
 
 def findMedia(session, root_path, exclude_paths=None):
+    total_add_time = 0.0
+
     num = 0
     c = 0
-    paths = []
     for root, dirs, files in os.walk(root_path, topdown=True, followlinks=False):
+        paths = []
         dir_path, name = os.path.split(root)
         if name.startswith('.'):
             continue
@@ -238,10 +256,13 @@ def findMedia(session, root_path, exclude_paths=None):
             continue
 
         # Add 'root' path
+        s = time.time()
         parent_path = addPath(session, root, None)
         c += 1
         num += 1
         session.commit()
+        e = time.time()
+        total_add_time += e - s
 
         # Get all the directories paths
         for d in dirs:
@@ -294,6 +315,7 @@ def findMedia(session, root_path, exclude_paths=None):
             paths.append(path)
 
         # Add paths to database
+        s = time.time()
         for path in paths:
             parent = parent_path
             if parent_path is not None:
@@ -302,8 +324,13 @@ def findMedia(session, root_path, exclude_paths=None):
             addPath(session, path, parent)
             session.commit()
             c += 1
+        e = time.time()
+        total_add_time += e - s
 
         c = printDots(c)
 
+    print ''
+    print '+' * 20
+    print 'Total Add Time:', total_add_time
+    print '+' * 20
     return num
-
